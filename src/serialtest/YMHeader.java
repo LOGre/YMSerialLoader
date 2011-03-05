@@ -36,7 +36,7 @@ public class YMHeader
     }
 
     /**
-     *
+     * dump the YM header
      */
     public void dump()
     {

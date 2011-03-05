@@ -70,16 +70,26 @@ public class SerialLoader {
             System.out.println("Depacking : " + fileToDepack);
             System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
 
+            // Depack and display header & dump on screen
             YMLoader loader = new YMLoader();
             loader.depack(fileToDepack);
-            YMHeader header = loader.decodeHeader();
+            YMHeader header = loader.decodeFileFormat();
             loader.dump();
-         
+
+            // init the serial loader
             SerialLoader serialLoader = new SerialLoader();
+
+            // connect the port at the good frequency
             serialLoader.connect(port, uartFreq);
 
+            // stream the data to the serial port
             serialLoader.stream(loader.getFramesBuffer(), header.getFrequency());
+
+            // disconnect the port
             serialLoader.disconnect();
+
+            //bye bye
+            System.out.println("Done, exiting");
         }
         catch(Exception ex)
         {
@@ -187,9 +197,37 @@ public class SerialLoader {
         try
         {
             Vector buf = buffer.getFramesData();
-            for(int frames=0; frames<buffer.getGetFramesNb();frames++)
+            for(int frames=0; frames<buffer.getGetFramesNb(); frames++)
             {
+                // send a full frame (16 registers)
+                /*
+                 *        -------------------------------------------------------
+                 *              b7 b6 b5 b4 b3 b2 b1 b0
+                 *         r0:  X  X  X  X  X  X  X  X   Period voice A
+                 *         r1:  -  -  -  -  X  X  X  X   Period voice A
+                 *         r2:  X  X  X  X  X  X  X  X   Period voice B
+                 *         r3:  -  -  -  -  X  X  X  X   Period voice B
+                 *         r4:  X  X  X  X  X  X  X  X   Period voice C
+                 *         r5:  -  -  -  -  X  X  X  X   Period voice C
+                 *         r6:  -  -  -  X  X  X  X  X   Noise period
+                 *         r7:  X  X  X  X  X  X  X  X   Mixer control
+                 *         r8:  -  -  -  X  X  X  X  X   Volume voice A
+                 *         r9:  -  -  -  X  X  X  X  X   Volume voice B
+                 *        r10:  -  -  -  X  X  X  X  X   Volume voice C
+                 *        r11:  X  X  X  X  X  X  X  X   Waveform period
+                 *        r12:  X  X  X  X  X  X  X  X   Waveform period
+                 *        r13:  -  -  -  -  X  X  X  X   Waveform shape
+                 *        -------------------------------------------------------
+                 *        New "virtual" registers to store extra data:
+                 *        -------------------------------------------------------
+                 *        r14:  -  -  -  -  -  -  -  -   Frequency for DD1 or TS1
+                 *        r15:  -  -  -  -  -  -  -  -   Frequency for DD2 or TS2
+                 *
+                 */
+
                 serialout.write((byte[]) (buf.get(frames)));
+
+                // Sleep to fit the YM dump frequency (usually 50Hz)
                 Thread.sleep((1/frequency)*1000);
             }
         }
@@ -202,7 +240,7 @@ public class SerialLoader {
     }
 
     /**
-     *
+     * Connect to the serial port at the given baud rate
      * @param portName
      * @param uartFreq
      * @throws Exception
@@ -227,7 +265,7 @@ public class SerialLoader {
                     serialPort.setSerialPortParams(uartFreq, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
                     serialout = serialPort.getOutputStream();
 
-                    System.out.println("Connected");
+                    System.out.println("Connected to port " + portName + " at " + uartFreq + " bauds");
                 }
                 else
                 {

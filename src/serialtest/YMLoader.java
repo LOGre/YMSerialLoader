@@ -1,22 +1,19 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * The YMLoader class
  */
 package serialtest;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import net.sourceforge.lhadecompressor.LhaEntry;
 import net.sourceforge.lhadecompressor.LhaFile;
 
 /**
- *
- * @author admin
+ * YM Loader
+ * @author shazz
  */
 public class YMLoader {
 
@@ -27,13 +24,18 @@ public class YMLoader {
 
     private byte[][] framesData;
 
+    /**
+     * Depack the YM file (LHA compression)
+     * @param filename
+     * @throws IOException
+     */
     public void depack(String filename) throws IOException {
         
         byte[] buff = new byte[BUFFSER_SIZE];
         LhaFile lhafile = new LhaFile(filename);
         LhaEntry entry = lhafile.getEntry(0);
 
-        System.out.println("EXTRACT FILE        = " + entry.getFile());
+        System.out.println("    EXTRACT FILE    = " + entry.getFile());
         System.out.println("    METHOD          = " + entry.getMethod());
         System.out.println("    COMPRESSED SIZE = " + entry.getCompressedSize());
         System.out.println("    ORIGINAL SIZE   = " + entry.getOriginalSize());
@@ -63,7 +65,12 @@ public class YMLoader {
 
     }
 
-    public YMHeader decodeHeader() throws Exception
+    /**
+     * Decode the YM file format
+     * @return
+     * @throws Exception
+     */
+    public YMHeader decodeFileFormat() throws Exception
     {
         if(buffer == null) throw new Exception("YM not depacked yet");
 
@@ -130,6 +137,9 @@ public class YMLoader {
         return header;
     }
 
+    /**
+     * dump the YM frames to screen
+     */
     public void dump()
     {
         header.dump();
@@ -147,11 +157,20 @@ public class YMLoader {
 
     }
 
+    /**
+     * Retrieve the frames
+     * @return a YMFramesBuffer
+     */
     public YMFramesBuffer getFramesBuffer()
     {
         return new YMFramesBuffer(framesData, header.getFrames(), 16);
     }
 
+    /**
+     * Util to read n char and build a java string from a Bytebuffer
+     * @param n
+     * @return the string
+     */
     private String getString(int n)
     {
         String res = "";
@@ -163,6 +182,11 @@ public class YMLoader {
         return res;
     }
 
+    /**
+     * Util to read a null terminated string from the bytebuffer
+     * @param n
+     * @return the NT String
+     */
     private String getStringNT()
     {
         String res = "";
@@ -176,7 +200,11 @@ public class YMLoader {
         return res;
     }
 
-
+    /**
+     * Util to read n bytes
+     * @param n
+     * @return the bytes
+     */
     private byte[] getByte(int n)
     {
         byte[] res = new byte[n];
@@ -188,6 +216,11 @@ public class YMLoader {
         return res;
     }
 
+    /**
+     * Util to read n integer
+     * @param n
+     * @return the int
+     */
     private int getInt(int n)
     {
         int res = 0;
