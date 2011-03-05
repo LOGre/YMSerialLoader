@@ -12,6 +12,7 @@ import gnu.io.CommPort;
 import gnu.io.CommPortIdentifier;
 import gnu.io.PortInUseException;
 import gnu.io.SerialPort;
+import gnu.io.UnsupportedCommOperationException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Enumeration;
@@ -69,34 +70,40 @@ public class SerialLoader {
         // Arguments parsed, let's depack and stream the YM dump now
         try
         {
-            System.out.println("Depacking : " + fileToDepack);
+            // init the serial loader
+            System.out.println("Init serial port");
+            SerialLoader serialLoader = new SerialLoader();
+
+            // connect the port at the good frequency
+            System.out.println("Connect serial port : " + port + " at " + uartFreq + " Hz");
+            serialLoader.connect(port, uartFreq);
 
             // Depack and display header & dump on screen
+            System.out.println("Depacking : " + fileToDepack);
             YMLoader loader = new YMLoader();
             loader.depack(fileToDepack);
             YMHeader header = loader.decodeFileFormat();
             loader.dump();
 
-            // init the serial loader
-            System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
-            SerialLoader serialLoader = new SerialLoader();
-
-            // connect the port at the good frequency
-            serialLoader.connect(port, uartFreq);
-
             // stream the data to the serial port
+            System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
             serialLoader.stream(loader.getFramesBuffer(), header.getFrequency());
 
             // disconnect the port
+            System.out.println("Stream ended, disconnecting...");
             serialLoader.disconnect();
 
             //bye bye
             System.out.println("Done, exiting");
         }
-        catch(Exception ex)
+        catch(YMProcessException ex)
         {
-            System.err.println("FATAL ERROR: " + ex.getMessage());
-            //ex.printStackTrace();
+            System.err.println("FATAL : " + ex.getMessage());
+            System.exit(1);
+        }
+        catch(SerialProcessException ex)
+        {
+            System.err.println("FATAL : " + ex.getMessage());
             System.exit(1);
         }
     }
@@ -104,33 +111,35 @@ public class SerialLoader {
     /**
      * Constructor
      * 
-     * @throws Exception
+     * @throws SerialProcessException
      */
-    public SerialLoader() throws Exception {
+    public SerialLoader() throws SerialProcessException {
         Properties props = System.getProperties();
         String jlp = props.getProperty("java.library.path");
         //props.setProperty("java.library.path", "/home/alain/tools/rxtx/rxtx-2.1-7-bins-r2/Linux/i686-unknown-linux-gnu");
         //System.setProperties(props);
         HashSet<CommPortIdentifier> portList = getAvailableSerialPorts();
-        for (CommPortIdentifier i : portList)
+        for (CommPortIdentifier cpi : portList)
         {
-            dump(i);
+            System.out.println(String.format("name=%s (portType=%s) is available", cpi.getName(), cpi.getPortType()));
         }
     }
 
     /**
      * Retrieve available serial ports on this computer
      * @return the list of comm ports
-     * @throws Exception in case of error while checking ports
+     * @throws SerialProcessException in case of error while checking ports
      */
-    public HashSet<CommPortIdentifier> getAvailableSerialPorts() throws Exception
+    public HashSet<CommPortIdentifier> getAvailableSerialPorts() throws SerialProcessException
     {
         HashSet<CommPortIdentifier> h = new HashSet<CommPortIdentifier>();
         Enumeration thePorts = CommPortIdentifier.getPortIdentifiers();
-
+        System.out.println("Check available port");
+        
         while (thePorts.hasMoreElements())
         {
             CommPortIdentifier com = (CommPortIdentifier) thePorts.nextElement();
+
 
             switch (com.getPortType())
             {
@@ -143,11 +152,13 @@ public class SerialLoader {
                     }
                     catch (PortInUseException e)
                     {
-                        throw new Exception("Port " + com.getName() + " already in use by " + com.getCurrentOwner());
+                        System.out.println(String.format("name=%s (portType=%s) is used by %s", com.getName(), com.getPortType(), com.getCurrentOwner()));
+                        //throw new SerialProcessException("Port " + com.getName() + " already in use by " + com.getCurrentOwner(), e);
                     } 
                     catch (Exception e) 
                     {
-                        throw new Exception("Port " + com.getName() + " cannot be opened");
+                        System.out.println(String.format("name=%s (portType=%s) connot be opened", com.getName(), com.getPortType()));
+                        //throw new SerialProcessException("Port " + com.getName() + " cannot be opened", e);
                     }
             }
         }
@@ -155,19 +166,10 @@ public class SerialLoader {
     }
 
     /**
-     * Dump the port info
-     */
-    private void dump(CommPortIdentifier cpi) {
-        String str = String.format("owner=%s\tname=%s\tportType=%s\t", cpi.getCurrentOwner(), cpi.getName(), cpi.getPortType());
-        System.out.println(str);
-
-    }
-
-    /**
      * Disconnect the serial port
-     * @throws Exception
+     * @throws SerialProcessException
      */
-    public void disconnect() throws Exception
+    public void disconnect() throws SerialProcessException
     {
         try
         {
@@ -177,20 +179,19 @@ public class SerialLoader {
         } 
         catch (IOException ex)
         {
-            throw new Exception(ex);
-        }
-        
+            throw new SerialProcessException("Cannot close the stream and port", ex);
+        }   
     }
 
     /**
      * Stream a YMBuffer thru the serial port according to the dump frequency
      * @param buffer
      * @param frequency
-     * @throws Exception
+     * @throws SerialProcessException
      */
-    public void stream(YMFramesBuffer buffer, int frequency) throws Exception
+    public void stream(YMFramesBuffer buffer, int frequency) throws SerialProcessException
     {
-        if(this.commPort == null || this.serialout == null) throw new Exception("Serial Connection not set");
+        if(this.commPort == null || this.serialout == null) throw new SerialProcessException("Serial Connection not set");
         
         try
         {
@@ -229,9 +230,13 @@ public class SerialLoader {
                 Thread.sleep((1/frequency)*1000);
             }
         }
+        catch (InterruptedException ex)
+        {
+            throw new SerialProcessException(ex);
+        }
         catch(IOException ex)
         {
-            throw new Exception(ex);
+            throw new SerialProcessException(ex);
         }
     }
 
@@ -239,9 +244,9 @@ public class SerialLoader {
      * Connect to the serial port at the given baud rate
      * @param portName
      * @param uartFreq
-     * @throws Exception
+     * @throws SerialProcessException
      */
-    public void connect(String portName, int uartFreq) throws Exception
+    public void connect(String portName, int uartFreq) throws SerialProcessException
     {
         try
         {
@@ -249,7 +254,7 @@ public class SerialLoader {
 
             if (portIdentifier.isCurrentlyOwned())
             {
-                throw new Exception("Port is currently in use");
+                throw new SerialProcessException("The port " + portName + " is currently in use");
             }
             else
             {
@@ -265,13 +270,25 @@ public class SerialLoader {
                 }
                 else
                 {
-                    throw new Exception("Only serial ports are handled.");
+                    throw new SerialProcessException("Only serial ports are handled.");
                 }
             }
         }
+        catch (IOException ex)
+        {
+           throw new SerialProcessException("Cannot get output stream", ex);
+        }
+        catch (UnsupportedCommOperationException ex)
+        {
+            throw new SerialProcessException("Unssuported operation", ex);
+        }
+        catch (PortInUseException ex)
+        {
+            throw new SerialProcessException("The port " + portName + " is already in use", ex);
+        }
         catch(gnu.io.NoSuchPortException ex)
         {
-            throw new Exception("This port doesn't exist");
+            throw new SerialProcessException("The port " + portName + " doesn't exist", ex);
         }
     }
 }

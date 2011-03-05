@@ -8,7 +8,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import net.sourceforge.lhadecompressor.LhaEntry;
+import net.sourceforge.lhadecompressor.LhaException;
 import net.sourceforge.lhadecompressor.LhaFile;
 
 /**
@@ -27,41 +30,48 @@ public class YMLoader {
     /**
      * Depack the YM file (LHA compression)
      * @param filename
-     * @throws IOException
+     * @throws YMProcessException
      */
-    public void depack(String filename) throws IOException {
-        
-        byte[] buff = new byte[BUFFSER_SIZE];
-        LhaFile lhafile = new LhaFile(filename);
-        LhaEntry entry = lhafile.getEntry(0);
-
-        System.out.println("    EXTRACT FILE    = " + entry.getFile());
-        System.out.println("    METHOD          = " + entry.getMethod());
-        System.out.println("    COMPRESSED SIZE = " + entry.getCompressedSize());
-        System.out.println("    ORIGINAL SIZE   = " + entry.getOriginalSize());
-        System.out.println("    TIME STAMP      = " + entry.getTimeStamp());
-        System.out.println("    OS ID           = " + (char) entry.getOS());
-
-        InputStream in = new BufferedInputStream(lhafile.getInputStream(entry), BUFFSER_SIZE);
-        ByteArrayOutputStream bastream = new ByteArrayOutputStream((int) entry.getOriginalSize());
-
-        int len = 0;
-        while (true)
+    public void depack(String filename) throws YMProcessException
+    {
+        try 
         {
-            len = in.read(buff, 0, BUFFSER_SIZE);
-            if(len < 0) break;
-
-            if(len < BUFFSER_SIZE)
-                bastream.write(buff, 0, len);
-            else
-                bastream.write(buff);
-                
+            byte[] buff = new byte[BUFFSER_SIZE];
+            LhaFile lhafile = new LhaFile(filename);
+            LhaEntry entry = lhafile.getEntry(0);
+            System.out.println("    EXTRACT FILE    = " + entry.getFile());
+            System.out.println("    METHOD          = " + entry.getMethod());
+            System.out.println("    COMPRESSED SIZE = " + entry.getCompressedSize());
+            System.out.println("    ORIGINAL SIZE   = " + entry.getOriginalSize());
+            System.out.println("    TIME STAMP      = " + entry.getTimeStamp());
+            System.out.println("    OS ID           = " + (char) entry.getOS());
+            InputStream in = new BufferedInputStream(lhafile.getInputStream(entry), BUFFSER_SIZE);
+            ByteArrayOutputStream bastream = new ByteArrayOutputStream((int) entry.getOriginalSize());
+            int len = 0;
+            while (true) {
+                len = in.read(buff, 0, BUFFSER_SIZE);
+                if (len < 0) {
+                    break;
+                }
+                if (len < BUFFSER_SIZE) {
+                    bastream.write(buff, 0, len);
+                } else {
+                    bastream.write(buff);
+                }
+            }
+            bastream.flush();
+            buffer = ByteBuffer.wrap(bastream.toByteArray());
+            bastream.close();
+            lhafile.close();
         }
-        bastream.flush();
-        buffer = ByteBuffer.wrap(bastream.toByteArray());
-
-        bastream.close();
-        lhafile.close();
+        catch (LhaException ex)
+        {
+            throw new YMProcessException(ex);
+        }
+        catch (IOException ex)
+        {
+            throw new YMProcessException(ex);
+        }
 
     }
 
@@ -70,9 +80,9 @@ public class YMLoader {
      * @return
      * @throws Exception
      */
-    public YMHeader decodeFileFormat() throws Exception
+    public YMHeader decodeFileFormat() throws YMProcessException
     {
-        if(buffer == null) throw new Exception("YM not depacked yet");
+        if(buffer == null) throw new YMProcessException("YM not depacked yet");
 
         try
         {
@@ -105,6 +115,8 @@ public class YMLoader {
             header.setAuthorName(getStringNT());
             header.setSongComment(getStringNT());
 
+            // get frames data, if interleaved, transpose the table
+
             framesData = new byte[header.getFrames()][16];
             if(header.isInterleaved())
             {
@@ -136,15 +148,14 @@ public class YMLoader {
                 }
             }
 
-            // check end
+            // check end tag
             String eof = getEndString();
             if(eof.matches("End!")) System.out.println("End of file found");
             else System.out.println("End : " + eof);
         }
         catch(Exception ex)
         {
-           ex.printStackTrace();
-           throw new Exception("Error while parsing the file");
+           throw new YMProcessException("Error while parsing the file", ex);
         }
 
         return header;
