@@ -74,64 +74,77 @@ public class YMLoader {
     {
         if(buffer == null) throw new Exception("YM not depacked yet");
 
-        header = new YMHeader();
-        header.setId(getString(4));
-        header.setLeo(getString(8));
-        header.setFrames(buffer.getInt());
-
-        int songAttr = buffer.getInt();
-        header.setInterleaved((songAttr&0x01)==1);
-        header.setDigiDrumsSignedSamples(((songAttr >> 1)&0x01)==1);
-        header.setDigiDrums4bitsSTFormat(((songAttr >> 2)&0x01)==1);
-        header.setDigidrums(buffer.getShort());
-        header.setClock(buffer.getInt());
-        header.setFrequency(buffer.getShort());
-        header.setLoopFrames(buffer.getInt());
-        header.setFuturDataSize(buffer.getShort());
-
-        digidrumsTable = new YMDigidrum[header.getDigidrums()];
-        for(int i=0; i<header.getDigidrums();i++)
+        try
         {
-            digidrumsTable[i] = new YMDigidrum();
-            int size = buffer.getInt();
-            digidrumsTable[i].setSampleSize(size);
-            
-            System.out.println("Sample " + i + " is size " + size);
-            digidrumsTable[i].setSample(getByte(size));
-        }
-        header.setSongName(getStringNT());
-        header.setAuthorName(getStringNT());
-        header.setSongComment(getStringNT());
+            header = new YMHeader();
+            header.setId(getString(4));
+            header.setLeo(getString(8));
+            header.setFrames(buffer.getInt());
 
-        framesData = new byte[header.getFrames()][16];
-        if(header.isInterleaved())
-        {
-            byte[][] transposedData = new byte[16][header.getFrames()];
-            for(int reg=0;reg<16;reg++)
+            int songAttr = buffer.getInt();
+            header.setInterleaved((songAttr&0x01)==1);
+            header.setDigiDrumsSignedSamples(((songAttr >> 1)&0x01)==1);
+            header.setDigiDrums4bitsSTFormat(((songAttr >> 2)&0x01)==1);
+            header.setDigidrums(buffer.getShort());
+            header.setClock(buffer.getInt());
+            header.setFrequency(buffer.getShort());
+            header.setLoopFrames(buffer.getInt());
+            header.setFuturDataSize(buffer.getShort());
+
+            digidrumsTable = new YMDigidrum[header.getDigidrums()];
+            for(int i=0; i<header.getDigidrums();i++)
             {
-                for(int frames=0;frames<header.getFrames();frames++)
-                {
-                    transposedData[reg][frames] = buffer.get();
-                }
+                digidrumsTable[i] = new YMDigidrum();
+                int size = buffer.getInt();
+                digidrumsTable[i].setSampleSize(size);
+
+                System.out.println("Sample " + i + " is size " + size);
+                digidrumsTable[i].setSample(getByte(size));
             }
-            // transpose data
-            for(int reg=0;reg<16;reg++)
+            header.setSongName(getStringNT());
+            header.setAuthorName(getStringNT());
+            header.setSongComment(getStringNT());
+
+            framesData = new byte[header.getFrames()][16];
+            if(header.isInterleaved())
             {
-                for(int frames=0;frames<header.getFrames();frames++)
-                {
-                    framesData[frames][reg] = transposedData[reg][frames];
-                }
-            }
-        }
-        else
-        {
-           for(int frames=0;frames<header.getFrames();frames++)
-           {
+                byte[][] transposedData = new byte[16][header.getFrames()];
                 for(int reg=0;reg<16;reg++)
                 {
-                    framesData[frames][reg] = buffer.get();
+                    for(int frames=0;frames<header.getFrames();frames++)
+                    {
+                        transposedData[reg][frames] = buffer.get();
+                    }
+                }
+                // transpose data
+                for(int reg=0;reg<16;reg++)
+                {
+                    for(int frames=0;frames<header.getFrames();frames++)
+                    {
+                        framesData[frames][reg] = transposedData[reg][frames];
+                    }
                 }
             }
+            else
+            {
+               for(int frames=0;frames<header.getFrames();frames++)
+               {
+                    for(int reg=0;reg<16;reg++)
+                    {
+                        framesData[frames][reg] = buffer.get();
+                    }
+                }
+            }
+
+            // check end
+            String eof = getEndString();
+            if(eof.matches("End!")) System.out.println("End of file found");
+            else System.out.println("End : " + eof);
+        }
+        catch(Exception ex)
+        {
+           ex.printStackTrace();
+           throw new Exception("Error while parsing the file");
         }
 
         return header;
@@ -145,12 +158,14 @@ public class YMLoader {
         header.dump();
         int nbFrames = header.getFrames();
 
-        System.out.println("r1\tr2\tr3\tr4\tr5\tr6\tr7\tr8\tr9\tr10\tr11\tr12\tr13\tr14\tr15\tr16");
+        System.out.println("Registers   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
+        System.out.println("-----------------------------------------------------------");
         for(int i=0;i<nbFrames;i++)
         {
+            System.out.print("Frame " + (Integer.toHexString(0x1000 | i )).substring(1).toUpperCase() + " : ");
             for(int j=0;j<16;j++)
             {
-                System.out.print((framesData[i][j] & 0xFF )+ "\t");
+                System.out.print(Integer.toHexString(0x100 | (framesData[i][j] & 0xFF )).substring(1).toUpperCase() + " ");
             }
             System.out.println("");
         }
@@ -195,6 +210,29 @@ public class YMLoader {
         {
             res += new Character((char) (aByte)).toString();
             aByte = buffer.get();
+        }
+
+        return res;
+    }
+
+    /**
+     * Util to read un til eof of buffer
+     * @param n
+     * @return the String
+     */
+    private String getEndString()
+    {
+        String res = "";
+        try
+        {
+            while(true)
+            {
+                res += new Character((char) buffer.get()).toString();
+            }
+        }
+        catch(java.nio.BufferUnderflowException ex)
+        {
+            // ok
         }
 
         return res;

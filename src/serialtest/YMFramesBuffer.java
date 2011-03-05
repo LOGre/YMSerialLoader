@@ -1,6 +1,5 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * YMFramesBuffer class
  */
 
 package serialtest;
@@ -9,7 +8,7 @@ import java.util.Vector;
 
 /**
  *
- * @author admin
+ * @author shazz
  */
 public class YMFramesBuffer
 {
