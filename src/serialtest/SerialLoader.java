@@ -24,6 +24,8 @@ import java.util.Vector;
  * @author Shazz, initial code by Alain M.
  *
  * Serial Loader main class
+ * It uses the rxtx library and javax.comm.CommPort
+ * http://download.oracle.com/docs/cd/E17802_01/products/products/javacomm/reference/api/index.html
  * 
  */
 public class SerialLoader {
@@ -53,7 +55,7 @@ public class SerialLoader {
             }
             catch (NumberFormatException e) {
                 System.err.println("Argument must be an integer");
-                System.err.println("Usage : java SerialLoader file port frequency");
+                System.err.println("Usage : java SerialTest.SerialLoader file port frequency");
                 System.exit(1);
             }
         }
@@ -68,7 +70,6 @@ public class SerialLoader {
         try
         {
             System.out.println("Depacking : " + fileToDepack);
-            System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
 
             // Depack and display header & dump on screen
             YMLoader loader = new YMLoader();
@@ -77,6 +78,7 @@ public class SerialLoader {
             loader.dump();
 
             // init the serial loader
+            System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
             SerialLoader serialLoader = new SerialLoader();
 
             // connect the port at the good frequency
@@ -110,13 +112,11 @@ public class SerialLoader {
         //props.setProperty("java.library.path", "/home/alain/tools/rxtx/rxtx-2.1-7-bins-r2/Linux/i686-unknown-linux-gnu");
         //System.setProperties(props);
         HashSet<CommPortIdentifier> portList = getAvailableSerialPorts();
-
         for (CommPortIdentifier i : portList)
         {
             dump(i);
         }
     }
-
 
     /**
      * Retrieve available serial ports on this computer
@@ -152,8 +152,6 @@ public class SerialLoader {
             }
         }
         return h;
-
-
     }
 
     /**
@@ -235,8 +233,6 @@ public class SerialLoader {
         {
             throw new Exception(ex);
         }
-    
-
     }
 
     /**
