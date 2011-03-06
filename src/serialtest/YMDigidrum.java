@@ -10,14 +10,41 @@ package serialtest;
  */
 public class YMDigidrum {
 
+    private int digidrumId;
     private int sampleSize;
-    byte[] sample;
+    private byte[] sample;
 
     /**
      * Constructor
      */
     public YMDigidrum() {
     }
+
+
+/**
+     * dump the YM digidrums data
+     */
+    public void dump()
+    {
+        System.out.println("Digidrum " + getDigidrumId() + " sample size : " + getSampleSize());
+    }
+
+    /**
+     * Get the digidrum id
+     * @return the digidrum id
+     */
+    public int getDigidrumId() {
+        return digidrumId;
+    }
+
+    /**
+     * Set the digidrum id
+     * @param digidrumId
+     */
+    public void setDigidrumId(int digidrumId) {
+        this.digidrumId = digidrumId;
+    }
+
 
     /**
      * Get the digidrum sample

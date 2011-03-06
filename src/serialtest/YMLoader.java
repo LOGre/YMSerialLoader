@@ -8,8 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.nio.ByteOrder;
 import net.sourceforge.lhadecompressor.LhaEntry;
 import net.sourceforge.lhadecompressor.LhaException;
 import net.sourceforge.lhadecompressor.LhaFile;
@@ -61,6 +60,10 @@ public class YMLoader {
             }
             bastream.flush();
             buffer = ByteBuffer.wrap(bastream.toByteArray());
+
+            // WARNING: All DWORD or WORD are stored in MOTOROLA order in the file (INTEL reverse)
+            buffer.order(ByteOrder.BIG_ENDIAN);
+            
             bastream.close();
             lhafile.close();
         }
@@ -77,8 +80,8 @@ public class YMLoader {
 
     /**
      * Decode the YM file format
-     * @return
-     * @throws Exception
+     * @return the YM Header
+     * @throws YMProcessException
      */
     public YMHeader decodeFileFormat() throws YMProcessException
     {
@@ -87,94 +90,232 @@ public class YMLoader {
         try
         {
             header = new YMHeader();
+
+            // Read ID
             header.setId(getString(4));
+            checkHeader(header.getId());
 
-            System.out.println(header.getId());
+            if(header.getId().equals(YMHeader.YM2)) throw new YMProcessException("Format " + YMHeader.YM2 + " not yet supported");
+            if(header.getId().equals(YMHeader.MIX1)) throw new YMProcessException("Format " + YMHeader.MIX1 + " not yet supported");
+            if(header.getId().equals(YMHeader.YMT2)) throw new YMProcessException("Format " + YMHeader.YMT2 + " not yet supported");
 
-            if(header.getId().matches("YM1!")) throw new YMProcessException("Format YM1 not yet supported");
-            else if(header.getId().matches("YM2!")) throw new YMProcessException("Format YM2 not yet supported");
-            else if(header.getId().matches("YM3b")) throw new YMProcessException("Format YM3b not yet supported");
-            else if(header.getId().matches("YM3!")) throw new YMProcessException("Format YM3 not yet supported");
-            else if(header.getId().matches("YM4!")) throw new YMProcessException("Format YM4 not yet supported");
-            else if(header.getId().matches("MIX1")) throw new YMProcessException("Format MIX1 not yet supported");
-
-
-
-            header.setLeo(getString(8));
-            header.setFrames(buffer.getInt());
-
-            int songAttr = buffer.getInt();
-            header.setInterleaved((songAttr&0x01)==1);
-            header.setDigiDrumsSignedSamples(((songAttr >> 1)&0x01)==1);
-            header.setDigiDrums4bitsSTFormat(((songAttr >> 2)&0x01)==1);
-            header.setDigidrums(buffer.getShort());
-            header.setClock(buffer.getInt());
-            header.setFrequency(buffer.getShort());
-            header.setLoopFrames(buffer.getInt());
-            header.setFuturDataSize(buffer.getShort());
-
-            if(header.getDigidrums() > 0)
-            {
-                digidrumsTable = new YMDigidrum[header.getDigidrums()];
-                for(int i=0; i<header.getDigidrums();i++)
-                {
-                    digidrumsTable[i] = new YMDigidrum();
-                    int size = buffer.getInt();
-                    digidrumsTable[i].setSampleSize(size);
-
-                    System.out.println("Sample " + i + " is size " + size);
-                    digidrumsTable[i].setSample(getByte(size));
-                }
-            }
-            header.setSongName(getStringNT());
-            header.setAuthorName(getStringNT());
-            header.setSongComment(getStringNT());
-
-            // get frames data, if interleaved, transpose the table
-
-            framesData = new byte[header.getFrames()][16];
-            if(header.isInterleaved())
-            {
-                byte[][] transposedData = new byte[16][header.getFrames()];
-                for(int reg=0;reg<16;reg++)
-                {
-                    for(int frames=0;frames<header.getFrames();frames++)
-                    {
-                        transposedData[reg][frames] = buffer.get();
-                    }
-                }
-                // transpose data
-                for(int reg=0;reg<16;reg++)
-                {
-                    for(int frames=0;frames<header.getFrames();frames++)
-                    {
-                        framesData[frames][reg] = transposedData[reg][frames];
-                    }
-                }
-            }
-            else
-            {
-               for(int frames=0;frames<header.getFrames();frames++)
-               {
-                    for(int reg=0;reg<16;reg++)
-                    {
-                        framesData[frames][reg] = buffer.get();
-                    }
-                }
-            }
-
-            // check end tag
-            String eof = getEndString();
-            if(eof.matches("End!")) System.out.println("End of file found");
-            else System.out.println("End : " + eof);
+            if(header.getId().equals(YMHeader.YM3)) decodeYM3Format(header, false);
+            else if(header.getId().equals(YMHeader.YM3)) decodeYM3Format(header, false);
+            else if(header.getId().equals(YMHeader.YM3b)) decodeYM3Format(header, true);
+            else if(header.getId().equals(YMHeader.YM5)) decodeYM5Format(header);
+            else if(header.getId().equals(YMHeader.YM6)) decodeYM6Format(header);
+            else if(header.getId().equals(YMHeader.YM4)) decodeYM4Format(header);
         }
         catch(Exception ex)
         {
             ex.printStackTrace();
-            throw new YMProcessException("Error while parsing the file", ex);
+            throw new YMProcessException("Error while parsing the file : " + ex.getMessage(), ex);
         }
 
         return header;
+    }
+
+    private void decodeYM6Format(YMHeader header) throws YMProcessException
+    {
+        decodeYM5Format(header);
+    }
+
+    private void decodeYM4Format(YMHeader header) throws YMProcessException
+    {
+        if(header == null) throw new YMProcessException("header not instanced");
+
+        // Read signature
+        header.setLeo(getString(8));
+        checkSignature(header.getLeo());
+
+        // Read dumped frames nb
+        header.setFrames(buffer.getInt());
+
+        // Read attributes
+        int songAttr = buffer.getInt();
+        header.setInterleaved((songAttr&0x01)==1);
+        header.setDigiDrumsSignedSamples(((songAttr >> 1)&0x01)==1);
+        header.setDigiDrums4bitsSTFormat(((songAttr >> 2)&0x01)==1);
+        header.setDigidrums(buffer.getShort());
+
+        // Read loop point if set
+        header.setLoopFrames(buffer.getInt());
+
+        // Read digidrums data if set
+        if(header.getDigidrums() > 0)
+        {
+            digidrumsTable = new YMDigidrum[header.getDigidrums()];
+            for(int i=0; i<header.getDigidrums();i++)
+            {
+                digidrumsTable[i] = new YMDigidrum();
+                digidrumsTable[i].setDigidrumId(i);
+
+                int size = buffer.getInt();
+                digidrumsTable[i].setSampleSize(size);
+
+                System.out.println("Sample " + i + " is size " + size);
+                digidrumsTable[i].setSample(getByte(size));
+            }
+        }
+
+        // Read song info
+        header.setSongName(getStringNT());
+        header.setAuthorName(getStringNT());
+        header.setSongComment(getStringNT());
+
+        // get frames data, if interleaved, transpose the table
+        framesData = new byte[header.getFrames()][16];
+        if(header.isInterleaved())
+        {
+            byte[][] transposedData = new byte[16][header.getFrames()];
+            for(int reg=0;reg<16;reg++)
+            {
+                for(int frames=0;frames<header.getFrames();frames++)
+                {
+                    transposedData[reg][frames] = buffer.get();
+                }
+            }
+            // transpose data
+            for(int reg=0;reg<16;reg++)
+            {
+                for(int frames=0;frames<header.getFrames();frames++)
+                {
+                    framesData[frames][reg] = transposedData[reg][frames];
+                }
+            }
+        }
+        else
+        {
+           for(int frames=0;frames<header.getFrames();frames++)
+           {
+                for(int reg=0;reg<16;reg++)
+                {
+                    framesData[frames][reg] = buffer.get();
+                }
+            }
+        }
+
+        // check end tag
+        String eof = getEndString();
+        if(eof.matches("End!")) System.out.println("End of file found");
+        else System.out.println("End : " + eof);
+    }
+
+    private void decodeYM5Format(YMHeader header) throws YMProcessException
+    {
+        if(header == null) throw new YMProcessException("header not instanced");
+
+        // Read signature
+        header.setLeo(getString(8));
+        checkSignature(header.getLeo());
+
+        // Read dumped frames nb
+        header.setFrames(buffer.getInt());
+
+        // Read attributes
+        int songAttr = buffer.getInt();
+        header.setInterleaved((songAttr&0x01)==1);
+        header.setDigiDrumsSignedSamples(((songAttr >> 1)&0x01)==1);
+        header.setDigiDrums4bitsSTFormat(((songAttr >> 2)&0x01)==1);
+        header.setDigidrums(buffer.getShort());
+
+        // only YM5 and YM6 formats handles the frequency stuff
+        header.setClock(buffer.getInt());
+        header.setFrequency(buffer.getShort());
+
+        // Read loop point if set
+        header.setLoopFrames(buffer.getInt());
+
+        // only YM5 and YM6 formats handles the future data stuff
+        header.setFuturDataSize(buffer.getShort());
+
+        // Read digidrums data if set
+        if(header.getDigidrums() > 0)
+        {
+            digidrumsTable = new YMDigidrum[header.getDigidrums()];
+            for(int i=0; i<header.getDigidrums();i++)
+            {
+                digidrumsTable[i] = new YMDigidrum();
+                digidrumsTable[i].setDigidrumId(i);
+
+                int size = buffer.getInt();
+                digidrumsTable[i].setSampleSize(size);
+
+                System.out.println("Sample " + i + " is size " + size);
+                digidrumsTable[i].setSample(getByte(size));
+            }
+        }
+
+        // Read song info
+        header.setSongName(getStringNT());
+        header.setAuthorName(getStringNT());
+        header.setSongComment(getStringNT());
+
+        // get frames data, if interleaved, transpose the table
+        framesData = new byte[header.getFrames()][16];
+        if(header.isInterleaved())
+        {
+            byte[][] transposedData = new byte[16][header.getFrames()];
+            for(int reg=0;reg<16;reg++)
+            {
+                for(int frames=0;frames<header.getFrames();frames++)
+                {
+                    transposedData[reg][frames] = buffer.get();
+                }
+            }
+            // transpose data
+            for(int reg=0;reg<16;reg++)
+            {
+                for(int frames=0;frames<header.getFrames();frames++)
+                {
+                    framesData[frames][reg] = transposedData[reg][frames];
+                }
+            }
+        }
+        else
+        {
+           for(int frames=0;frames<header.getFrames();frames++)
+           {
+                for(int reg=0;reg<16;reg++)
+                {
+                    framesData[frames][reg] = buffer.get();
+                }
+            }
+        }
+
+        // check end tag
+        String eof = getEndString();
+        if(eof.matches("End!")) System.out.println("End of file found");
+        else System.out.println("End : " + eof);
+
+    }
+
+    private void decodeYM3Format(YMHeader header, boolean loopSupport) throws YMProcessException
+    {
+        if(header == null) throw new YMProcessException("header not instanced");
+
+        // get frames data, nvbl = (ymfile_size-4)/14;
+        int nbframes = (buffer.capacity()-4)/14;
+        header.setFrames(nbframes);
+
+        framesData = new byte[header.getFrames()][16];
+        for(int frames=0;frames<nbframes;frames++)
+        {
+            for(int reg=0;reg<14;reg++)
+            {
+                framesData[frames][reg] = buffer.get();
+            }
+
+            // set to 0 special effects registers
+            framesData[frames][14] = 0;
+            framesData[frames][15] = 0;
+        }
+
+        if(loopSupport)
+        {
+            //header.setLoopFrames(getMotoInt());
+            header.setLoopFrames(buffer.getInt());
+        }
     }
 
     /**
@@ -183,6 +324,15 @@ public class YMLoader {
     public void dump()
     {
         header.dump();
+
+        if(header.getDigidrums() > 0)
+        {
+            for(int d=0; d<digidrumsTable.length; d++)
+            {
+                digidrumsTable[d].dump();
+            }
+        }
+
         int nbFrames = header.getFrames();
 
         System.out.println("Registers   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
@@ -313,5 +463,43 @@ public class YMLoader {
         }
 
         return  res;
+    }
+
+    /**
+     * Util to read Motorola Long Word
+     * @return the int in reverse byte order
+     */
+    private int getMotoInt()
+    {
+            byte[] aByte = getByte(4);
+            return (((aByte[3] & 0xFF) << 24) | ((aByte[2] & 0xFF) << 16) | ((aByte[1] & 0xFF) << 8) | ((aByte[0] & 0xFF)));
+    }
+
+    /**
+     * Check header validity
+     * @throws YMProcessException
+     */
+    private void checkHeader(String id) throws YMProcessException
+    {
+            boolean found = false;
+            for(int i=0; i<YMHeader.idtags.length; i++)
+            {
+                if(id.equals(YMHeader.idtags[i]))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if(!found) throw new YMProcessException("ID tag not recognized");   
+    }
+
+    /**
+     * Check the signature
+     * @throws YMProcessException
+     */
+    private void checkSignature(String leo) throws YMProcessException
+    {
+        if(!leo.equals(YMHeader.SIGNATURE)) throw new YMProcessException("Signature doesn't match");
     }
 }

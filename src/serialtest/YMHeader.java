@@ -11,21 +11,31 @@ package serialtest;
 public class YMHeader
 {
     private String id;
-    private String leo;
-    private int frames;
-    private boolean interleaved;
-    private boolean digiDrumsSignedSamples;
-    private boolean digiDrums4bitsSTFormat;
-    private short digidrums;
-    private int clock;
-    private short frequency;
-    private int loopFrames;
-    private int futurDataSize;
+    private String leo = "no sig";
+    private int frames = 0;
+    private boolean interleaved = false;
+    private boolean digiDrumsSignedSamples = false;
+    private boolean digiDrums4bitsSTFormat = false;
+    private short digidrums = 0;
+    private int clock = 2000000;
+    private short frequency = 50;
+    private int loopFrames = 0;
+    private int futurDataSize = 0;
 
-    private String songName;
-    private String authorName;
-    private String songComment;
+    private String songName = "No title";
+    private String authorName = "No author";
+    private String songComment = "No comments";
 
+    public static final String YM2 = "YM2!";
+    public static final String YM3 = "YM3!";
+    public static final String YM3b = "YM3b";
+    public static final String YM4 = "YM4!";
+    public static final String YM5 = "YM5!";
+    public static final String YM6 = "YM6!";
+    public static final String MIX1 = "MIX1";
+    public static final String YMT2 = "YMT2";
+    public static final String[] idtags = { YM2, YM3, YM3b, YM4, YM5, YM6, MIX1, YMT2};
+    public static final String SIGNATURE = "LeOnArD!";
 
     /**
      * Constructor
@@ -57,11 +67,23 @@ public class YMHeader
             if(!isDigiDrums4bitsSTFormat()) System.out.print("not ");
             System.out.println("in ST format");
         }
+        else
+        {
+            System.out.println("No digidrums");
+        }
+
         System.out.println("YM clock : " + getClock() + " Hz");
         System.out.println("Replay frequency : " + getFrequency() + " Hz");
-        
-        if(getLoopFrames() > 0)  System.out.println("Loop after " + getLoopFrames() + " frames");
-        System.out.println("Unused : " + getFuturDataSize());
+
+
+        if(getLoopFrames() > 0)
+        {
+            minutes = Math.abs(getLoopFrames()/getFrequency()/60);
+            sec = Math.abs(getLoopFrames()/getFrequency() - (minutes*60));  
+            System.out.println("Loop after " + getLoopFrames() + " frames (" + minutes + " min " + sec + " sec)");
+        }
+        if(getFuturDataSize() != 0)
+            System.out.println("Unused : " + getFuturDataSize());
 
         System.out.println("Song : " + getSongName());
         System.out.println("Author : " + getAuthorName());
