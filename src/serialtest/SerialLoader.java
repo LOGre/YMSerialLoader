@@ -88,7 +88,7 @@ public class SerialLoader {
 
             // stream the data to the serial port
             System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
-            serialLoader.stream(loader.getFramesBuffer(), header.getFrequency());
+            serialLoader.stream(loader.getFramesBuffer(), header);
 
             // disconnect the port
             System.out.println("Stream ended, disconnecting...");
@@ -190,7 +190,7 @@ public class SerialLoader {
      * @param frequency
      * @throws SerialProcessException
      */
-    public void stream(YMFramesBuffer buffer, int frequency) throws SerialProcessException
+    public void stream(YMFramesBuffer buffer, YMHeader header) throws SerialProcessException
     {
         if(this.commPort == null || this.serialout == null) throw new SerialProcessException("Serial Connection not set");
         
@@ -228,7 +228,23 @@ public class SerialLoader {
                 serialout.write((byte[]) (buf.get(frames)));
 
                 // Sleep to fit the YM dump frequency (usually 50Hz)
-                Thread.sleep((1/frequency)*1000);
+                Thread.sleep((1/header.getFrequency())*1000);
+            }
+            
+            // manage loop
+            if(header.getLoopFrames() > 0)
+            {
+                while(true)
+                {
+                    for(int frames=header.getLoopFrames(); frames<buffer.getGetFramesNb(); frames++)
+                    {
+                        // send a full frame (16 registers)
+                        serialout.write((byte[]) (buf.get(frames)));
+
+                        // Sleep to fit the YM dump frequency (usually 50Hz)
+                        Thread.sleep((1/header.getFrequency())*1000);
+                    }
+                }
             }
         }
         catch (InterruptedException ex)

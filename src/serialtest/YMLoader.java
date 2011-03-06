@@ -26,6 +26,24 @@ public class YMLoader {
 
     private byte[][] framesData;
 
+    private boolean alreadyDecoded = false;
+
+    /**
+     * Get the Digidrums 
+     * @return Digidrums
+     */
+    public YMDigidrum[] getDigidrumsTable() {
+        return digidrumsTable;
+    }
+
+    /**
+     * Get the Header
+     * @return the header
+     */
+    public YMHeader getHeader() {
+        return header;
+    }
+
     /**
      * Depack the YM file (LHA compression)
      * @param filename
@@ -35,6 +53,13 @@ public class YMLoader {
     {
         try 
         {
+            // reset the stuff if called 2 times
+            alreadyDecoded = false;
+            buffer = null;
+            header = null;
+            digidrumsTable = null;
+            framesData = null;
+            
             byte[] buff = new byte[BUFFSER_SIZE];
             LhaFile lhafile = new LhaFile(filename);
             LhaEntry entry = lhafile.getEntry(0);
@@ -86,6 +111,7 @@ public class YMLoader {
     public YMHeader decodeFileFormat() throws YMProcessException
     {
         if(buffer == null) throw new YMProcessException("YM not depacked yet");
+        if(alreadyDecoded) return this.header;
 
         try
         {
@@ -105,12 +131,15 @@ public class YMLoader {
             else if(header.getId().equals(YMHeader.YM5)) decodeYM5Format(header);
             else if(header.getId().equals(YMHeader.YM6)) decodeYM6Format(header);
             else if(header.getId().equals(YMHeader.YM4)) decodeYM4Format(header);
+
+            alreadyDecoded = true;
         }
         catch(Exception ex)
         {
             ex.printStackTrace();
             throw new YMProcessException("Error while parsing the file : " + ex.getMessage(), ex);
         }
+
 
         return header;
     }
