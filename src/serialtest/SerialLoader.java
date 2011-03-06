@@ -19,6 +19,7 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Vector;
+//import serialtest.emulator.SerialPortEmu;
 
 /**
  *
@@ -193,7 +194,9 @@ public class SerialLoader {
     public void stream(YMFramesBuffer buffer, YMHeader header) throws SerialProcessException
     {
         if(this.commPort == null || this.serialout == null) throw new SerialProcessException("Serial Connection not set");
-        
+
+        //SerialPortEmu serialPortEmu = new SerialPortEmu();
+
         try
         {
             Vector buf = buffer.getFramesData();
@@ -226,10 +229,12 @@ public class SerialLoader {
                  */
 
                 serialout.write((byte[]) (buf.get(frames)));
+                //serialPortEmu.receive((byte[]) (buf.get(frames)));
 
                 // Sleep to fit the YM dump frequency (usually 50Hz)
-                Thread.sleep((1/header.getFrequency())*1000);
+                Thread.sleep( (int) ((1/(float) header.getFrequency()) * 700));
             }
+            System.out.println("fini");
             
             // manage loop
             if(header.getLoopFrames() > 0)
