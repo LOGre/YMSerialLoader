@@ -88,6 +88,18 @@ public class YMLoader {
         {
             header = new YMHeader();
             header.setId(getString(4));
+
+            System.out.println(header.getId());
+
+            if(header.getId().matches("YM1!")) throw new YMProcessException("Format YM1 not yet supported");
+            else if(header.getId().matches("YM2!")) throw new YMProcessException("Format YM2 not yet supported");
+            else if(header.getId().matches("YM3b")) throw new YMProcessException("Format YM3b not yet supported");
+            else if(header.getId().matches("YM3!")) throw new YMProcessException("Format YM3 not yet supported");
+            else if(header.getId().matches("YM4!")) throw new YMProcessException("Format YM4 not yet supported");
+            else if(header.getId().matches("MIX1")) throw new YMProcessException("Format MIX1 not yet supported");
+
+
+
             header.setLeo(getString(8));
             header.setFrames(buffer.getInt());
 
@@ -101,15 +113,18 @@ public class YMLoader {
             header.setLoopFrames(buffer.getInt());
             header.setFuturDataSize(buffer.getShort());
 
-            digidrumsTable = new YMDigidrum[header.getDigidrums()];
-            for(int i=0; i<header.getDigidrums();i++)
+            if(header.getDigidrums() > 0)
             {
-                digidrumsTable[i] = new YMDigidrum();
-                int size = buffer.getInt();
-                digidrumsTable[i].setSampleSize(size);
+                digidrumsTable = new YMDigidrum[header.getDigidrums()];
+                for(int i=0; i<header.getDigidrums();i++)
+                {
+                    digidrumsTable[i] = new YMDigidrum();
+                    int size = buffer.getInt();
+                    digidrumsTable[i].setSampleSize(size);
 
-                System.out.println("Sample " + i + " is size " + size);
-                digidrumsTable[i].setSample(getByte(size));
+                    System.out.println("Sample " + i + " is size " + size);
+                    digidrumsTable[i].setSample(getByte(size));
+                }
             }
             header.setSongName(getStringNT());
             header.setAuthorName(getStringNT());
@@ -155,7 +170,8 @@ public class YMLoader {
         }
         catch(Exception ex)
         {
-           throw new YMProcessException("Error while parsing the file", ex);
+            ex.printStackTrace();
+            throw new YMProcessException("Error while parsing the file", ex);
         }
 
         return header;
@@ -218,6 +234,24 @@ public class YMLoader {
         String res = "";
         byte aByte = buffer.get();
         while(aByte != 0)
+        {
+            res += new Character((char) (aByte)).toString();
+            aByte = buffer.get();
+        }
+
+        return res;
+    }
+
+    /**
+     * Util to read a null terminated string from the bytebuffer
+     * @param n
+     * @return the NT String
+     */
+    private String getStringCT(char c)
+    {
+        String res = "";
+        byte aByte = buffer.get();
+        while(aByte != c)
         {
             res += new Character((char) (aByte)).toString();
             aByte = buffer.get();

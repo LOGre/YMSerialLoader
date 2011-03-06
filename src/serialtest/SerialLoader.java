@@ -27,6 +27,7 @@ import java.util.Vector;
  * Serial Loader main class
  * It uses the rxtx library and javax.comm.CommPort
  * http://download.oracle.com/docs/cd/E17802_01/products/products/javacomm/reference/api/index.html
+ * http://rxtx.qbang.org/wiki/index.php/Main_Page
  * 
  */
 public class SerialLoader {
