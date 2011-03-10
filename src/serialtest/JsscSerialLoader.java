@@ -28,24 +28,31 @@ public class JsscSerialLoader
         String fileToDepack = "";
         String port = "";
         int uartFreq = 0;
-        if (args.length == 3)
+        int tempo = 0;
+
+        if (args.length == 4)
         {
             fileToDepack = args[0];
             port = args[1];
             try
             {
                 uartFreq = Integer.parseInt(args[2]);
+                if(uartFreq < 0) uartFreq = 9600;
+
+                tempo = Integer.parseInt(args[3]);
+                if(tempo < 0) tempo = 0;
             }
-            catch (NumberFormatException e) {
-                System.err.println("Argument must be an integer");
-                System.err.println("Usage : java SerialTest.SerialLoader file port frequency");
+            catch (NumberFormatException e)
+            {
+                System.err.println("Arguments frequency and delay must be integers");
+                showUsage();
                 System.exit(1);
             }
         }
         else
         {
-            System.err.println("Wrong arguments");
-            System.err.println("Usage : java SerialLoader file port frequency");
+            System.err.println("Wrong number of arguments");
+            showUsage();
             System.exit(1);
         }
 
@@ -57,7 +64,7 @@ public class JsscSerialLoader
             JsscSerialLoader serialLoader = new JsscSerialLoader();
 
             // connect the port at the good frequency
-            System.out.println("Connect serial port : " + port + " at " + uartFreq + " Hz");
+            System.out.println("Connect serial port : " + port + " at " + uartFreq + " bauds");
             serialLoader.connect(port, uartFreq);
 
             // Depack and display header & dump on screen
@@ -68,8 +75,11 @@ public class JsscSerialLoader
             loader.dump();
 
             // stream the data to the serial port
-            System.out.println("Sending on port : " + port + " at " + uartFreq + " Hz");
-            serialLoader.stream(loader.getFramesBuffer(), header);
+            if(tempo > 0)
+                System.out.println("Sending on port " + port + " at " + 1.0f/((float)tempo/1000.0f) + " Hz");
+            else
+                System.out.println("Sending on port " + port + " without delay");
+            serialLoader.stream(loader.getFramesBuffer(), header, tempo);
 
             // disconnect the port
             System.out.println("Stream ended, disconnecting...");
@@ -88,6 +98,15 @@ public class JsscSerialLoader
             System.err.println("FATAL : " + ex.getMessage());
             System.exit(1);
         }
+    }
+
+    private static void showUsage()
+    {
+        System.err.println("Usage : java SerialTest.SerialLoader file port frequency delay");
+        System.err.println("file : YM file path");
+        System.err.println("port : Serial port (ex: COM3)");
+        System.err.println("frequency : UART baudrate");
+        System.err.println("delay : tempo between 2 sends in ms");
     }
 
     /**
@@ -133,7 +152,7 @@ public class JsscSerialLoader
      * @param frequency
      * @throws SerialProcessException
      */
-    public void stream(YMFramesBuffer buffer, YMHeader header) throws SerialProcessException
+    public void stream(YMFramesBuffer buffer, YMHeader header, int tempo) throws SerialProcessException
     {
         if(this.serialPort == null) throw new SerialProcessException("Serial Connection not set");
 
@@ -150,6 +169,7 @@ public class JsscSerialLoader
 
                 // Sleep to fit the YM dump frequency (usually 50Hz)
                 //Thread.sleep( (int) ((1/(float) header.getFrequency())));
+                if(tempo > 0) Thread.sleep( tempo );
             }
             System.out.println("end before loop");
 
@@ -166,14 +186,19 @@ public class JsscSerialLoader
 
                         // Sleep to fit the YM dump frequency (usually 50Hz)
                         //Thread.sleep((1/header.getFrequency())*200);
+                        if(tempo > 0) Thread.sleep( tempo );
                     }
                 }
             }
+        }
+        catch (InterruptedException ex) {
+            throw new SerialProcessException(ex.getMessage(), ex);
         }
         catch (SerialPortException ex)
         {
             throw new SerialProcessException(ex.getMessage(), ex);
         }
+
     }
 
     /**
