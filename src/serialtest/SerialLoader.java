@@ -203,38 +203,15 @@ public class SerialLoader {
             for(int frames=0; frames<buffer.getGetFramesNb(); frames++)
             {
                 // send a full frame (16 registers)
-                /*
-                 *        -------------------------------------------------------
-                 *              b7 b6 b5 b4 b3 b2 b1 b0
-                 *         r0:  X  X  X  X  X  X  X  X   Period voice A
-                 *         r1:  -  -  -  -  X  X  X  X   Period voice A
-                 *         r2:  X  X  X  X  X  X  X  X   Period voice B
-                 *         r3:  -  -  -  -  X  X  X  X   Period voice B
-                 *         r4:  X  X  X  X  X  X  X  X   Period voice C
-                 *         r5:  -  -  -  -  X  X  X  X   Period voice C
-                 *         r6:  -  -  -  X  X  X  X  X   Noise period
-                 *         r7:  X  X  X  X  X  X  X  X   Mixer control
-                 *         r8:  -  -  -  X  X  X  X  X   Volume voice A
-                 *         r9:  -  -  -  X  X  X  X  X   Volume voice B
-                 *        r10:  -  -  -  X  X  X  X  X   Volume voice C
-                 *        r11:  X  X  X  X  X  X  X  X   Waveform period
-                 *        r12:  X  X  X  X  X  X  X  X   Waveform period
-                 *        r13:  -  -  -  -  X  X  X  X   Waveform shape
-                 *        -------------------------------------------------------
-                 *        New "virtual" registers to store extra data:
-                 *        -------------------------------------------------------
-                 *        r14:  -  -  -  -  -  -  -  -   Frequency for DD1 or TS1
-                 *        r15:  -  -  -  -  -  -  -  -   Frequency for DD2 or TS2
-                 *
-                 */
+                byte[] regs = (byte[]) (buf.get(frames));
+                serialout.write(regs);
 
-                serialout.write((byte[]) (buf.get(frames)));
                 //serialPortEmu.receive((byte[]) (buf.get(frames)));
 
                 // Sleep to fit the YM dump frequency (usually 50Hz)
-                Thread.sleep( (int) ((1/(float) header.getFrequency()) * 700));
+                //Thread.sleep( (int) ((1/(float) header.getFrequency())));
             }
-            System.out.println("fini");
+            System.out.println("end before loop");
             
             // manage loop
             if(header.getLoopFrames() > 0)
@@ -244,10 +221,19 @@ public class SerialLoader {
                     for(int frames=header.getLoopFrames(); frames<buffer.getGetFramesNb(); frames++)
                     {
                         // send a full frame (16 registers)
-                        serialout.write((byte[]) (buf.get(frames)));
+                        /*byte[] regs = (byte[]) (buf.get(frames));
+                        for(int reg=0;reg<14; reg++)
+                        {
+                            serialout.write(reg & 0xFF);
+                            serialout.write(regs[reg] & 0xFF);
+                        }*/
+
+                        // send a full frame (16 registers)
+                        byte[] regs = (byte[]) (buf.get(frames));
+                        serialout.write(regs);
 
                         // Sleep to fit the YM dump frequency (usually 50Hz)
-                        Thread.sleep((1/header.getFrequency())*1000);
+                        Thread.sleep((1/header.getFrequency())*200);
                     }
                 }
             }

@@ -25,10 +25,18 @@ public class YMFramesBuffer
     public YMFramesBuffer(byte[][] data, int framesNb, int registersNb)
     {
         this.framesData = new Vector();
-        
+
+        // Store reg number then reg value
+
         for(int frames=0; frames<framesNb; frames++)
         {
-            this.framesData.add(data[frames]);
+            byte[] regs = new byte[registersNb*2];
+            for(int reg=0; reg<registersNb; reg++)
+            {
+                regs[reg*2] = (byte) (reg & 0xFF);
+                regs[(reg*2)+1] = data[frames][reg];
+            }
+            this.framesData.add(regs);
         }
         this.framesNb = framesNb;
         this.registersNb = registersNb;

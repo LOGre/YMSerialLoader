@@ -365,7 +365,7 @@ public class YMLoader {
             }
         }
 
-        /*int nbFrames = header.getFrames();
+        int nbFrames = header.getFrames();
 
         System.out.println("Registers   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
         System.out.println("-----------------------------------------------------------");
@@ -377,7 +377,7 @@ public class YMLoader {
                 System.out.print(Integer.toHexString(0x100 | (framesData[i][j] & 0xFF )).substring(1).toUpperCase() + " ");
             }
             System.out.println("");
-        }*/
+        }
 
     }
 
